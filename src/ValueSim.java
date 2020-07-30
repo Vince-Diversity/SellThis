@@ -85,6 +85,10 @@ public class ValueSim {
     public String getSimName() {
         return simName;
     }
+
+    public Line getLine() {
+        return line;
+    }
 }
 
 class Line {
@@ -100,6 +104,10 @@ class Line {
     }
     public double next() {
         current += increment;
+        return current;
+    }
+
+    public double getCurrent() {
         return current;
     }
 }

@@ -1,44 +1,52 @@
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Arrays;
-import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
+/**
+ * Tells how much to sell day-by-day with respect to (current market) value by computing
+ *
+ *        value
+ * ------------------- * remaining possession
+ * value + future_value
+ *
+ * where future_value = selling_days_remaining * future_value_prediction.
+ * When selling_days_remaining = 0, anything remaining is sold. Should behave smoothly though.
+ */
 public class SellStocks {
 
     private int attempts;
     private BigDecimal owned;
     private final BigDecimal original;
-    private final Limit limit;
     private final ValueSim sim;
     private final LinkedList<BigDecimal> sellHistory;
     private final LinkedList<BigDecimal> valueHistory;
-    private final Iterator<BigDecimal> values;
+    private Function<BigDecimal,BigDecimal> evaluate;
+    private BiConsumer<BigDecimal,BigDecimal> proceed;
 
-    public SellStocks(BigDecimal owned, Limit limit, ValueSim sim, BigDecimal[] values) {
-        this.attempts = sim.getValSize() - 1;
+    public SellStocks(BigDecimal owned, Limit limit, ValueSim sim) {
+        attempts = sim.getValSize() - 1;
         this.owned = owned;
-        this.original = owned;
-        this.limit = limit;
+        original = owned;
         this.sim = sim;
         this.sellHistory = new LinkedList<>();
         this.valueHistory = new LinkedList<>();
-        this.values = makeIterable(values);
-    }
-
-    private Iterator<BigDecimal> makeIterable(BigDecimal[] old) {
-        return Arrays.stream(old).iterator();
+        switch (limit) {
+            case BOUNDED:
+                evaluate = this::boundedRate;
+                proceed = this::sellBounded;
+            case FLEX:
+                evaluate = this::flexRate;
+                proceed = this::sellFlex;
+        }
     }
 
     /**
      * Yields proportion of owned
      */
     public BigDecimal today(BigDecimal value) {
-        switch (limit) {
-            case BOUNDED: return boundedRate(value);
-            case FLEX: return flexRate(value);
-            default: return new BigDecimal("-1");
-        }
+        return evaluate.apply(value);
     }
 
     /**
@@ -68,11 +76,21 @@ public class SellStocks {
      * Confirms today's deal, moves on to the next deal.
      */
     public void sell(BigDecimal yield, BigDecimal value) {
+        proceed.accept(yield,value);
+    }
+
+    private void sellBounded(BigDecimal yield, BigDecimal value) {
+        sellHelper(yield, value);
+    }
+
+    private void sellFlex(BigDecimal yield, BigDecimal value) {
+        sellHelper(yield, value);
+        attempts--;
+    }
+
+    private void sellHelper(BigDecimal yield, BigDecimal value) {
         sellHistory.add(yield);
         owned = owned.subtract(yield);
-        if (!limit.equals(Limit.BOUNDED)) {
-            attempts--;
-        }
         valueHistory.add(value);
     }
 
@@ -81,10 +99,6 @@ public class SellStocks {
     public LinkedList<BigDecimal> getSellHistory() { return sellHistory; }
 
     public LinkedList<BigDecimal> getValueHistory() {return valueHistory; }
-
-    public int getAttempts() {
-        return attempts;
-    }
 
     public ValueSim getSim() {
         return sim;

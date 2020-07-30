@@ -8,11 +8,12 @@ import java.util.LinkedList;
 
 /**
  * Tests for meaningful method:
- * - 'total': all has been sold neither too early or too late.
- * - 'stability': if the value happens to be constant, no extremes.
- * - 'earn': method is better than selling day 1 or last day.
+ * - 'total': all has been sold neither too early nor too late.
+ * - 'stability': if the value happens to be constant, no unstable fluctuations.
+ * - 'yield': method can be better than selling day 1 or last day.
  *
- * Before and After run twice due to different import origins
+ * Further tests someplace else
+ * - 'converge': the closer prediction is to input value, the greater yield.
  */
 public class CodeTests {
 
@@ -20,22 +21,20 @@ public class CodeTests {
     private final BigDecimal top = new BigDecimal("13.00");
     private final BigDecimal bot = new BigDecimal("9.00");
     private final int defaultSize = 20;
-//    private final long defaultSeed = 400L;
     private final long defaultSeed = 400L;
     private final BigDecimal defaultValue = new BigDecimal("10.00");
 
     @Test
     public void reasonable() {
         int attempts = 9;
-        BigDecimal[] values = fillValues(attempts);
         ValueSim sim = new ValueSim(BigDecimal.ZERO, defaultValue.multiply(new BigDecimal(2)), attempts+1);
-        SellStocks selling = new SellStocks(owned, Limit.BOUNDED, sim, values);
+        SellStocks selling = new SellStocks(owned, Limit.BOUNDED, sim);
         BigDecimal sellToday = selling.today(defaultValue);
         System.out.println("Bounded first sell reasonable? " + sellToday);
     }
 
     private SellStocks flexHelper(BigDecimal[] values, ValueSim sim) {
-        SellStocks selling = new SellStocks(owned, Limit.FLEX, sim, values);
+        SellStocks selling = new SellStocks(owned, Limit.FLEX, sim);
         for (int i=0; i<selling.getSim().getValSize(); i++) {
             BigDecimal value = values[i];
             BigDecimal sellToday = selling.today(value);
@@ -98,8 +97,8 @@ public class CodeTests {
         // assert that method yields more than naive approach
         BigDecimal flex = flexYield.getTotal();
         BigDecimal naive = flexBank.naiveYield(owned, valueHist);
-        System.out.println(
-                selling.getSim().getSimName()
+        System.out.println("\n"
+                + selling.getSim().getSimName()
                 + "Yield is " + flex
                 + " instead of " + naive + " with history: \n"
                 + Arrays.toString(flexYield.getYields()));
@@ -123,19 +122,20 @@ public class CodeTests {
      */
     @Test
     public void yieldRand() {
-        double horizontalVal = 10.;
-        Line horizontal = new Line(horizontalVal, 0);
-        ValueSim sim = new ValueSim(8., 12.,
-                20, 2., horizontal, defaultSeed);
+        double val = 10.;
+        Line line = new Line(val, 0.05);
+        ValueSim sim = new ValueSim(8., 13.,
+                20, 2., line, defaultSeed);
         BigDecimal[] values = sim.randLine();
         BigDecimal simMean = sim.mean(values);
-        double bias = simMean.doubleValue()/horizontalVal;
-        System.out.println("This seed is biased by " + bias + "\n"
-                + "RandDist is \n"
-                + Arrays.toString(values));
+        double bias = simMean.doubleValue()/val;
         SellStocks selling = flexHelper(values, sim);
         CheckPack check = yieldCheck(selling);
-        assertTrue(check.getTest().doubleValue() >= check.getKnown().doubleValue()*bias);
+        System.out.println("This seed is biased by " + bias + ",\n"
+                + "Line goes from " + val + " to " + selling.getSim().getLine().getCurrent() + "\n"
+                + "RandDist is \n"
+                + Arrays.toString(values));
+        assertTrue(check.getTest().doubleValue() >= check.getKnown().doubleValue());
     }
 
     @Test
