@@ -38,16 +38,21 @@ public class CodeTests {
         System.out.println("Bounded first sell reasonable? " + sellToday);
     }
 
-    private SellStocks flexHelper() {
-        int attempts = 19;   // zero indexed
-        BigDecimal value = new BigDecimal("10.00");
+    private SellStocks flexHelper(BigDecimal[] values, int attempts) {
         ValueSim sim = new ValueSim(bot, top);
         SellStocks selling = new SellStocks(attempts, owned, Limit.FLEX, sim);
         for (int i=attempts; i>=0; i--) {
+            BigDecimal value = values[i];
             BigDecimal sellToday = selling.today(value);
             selling.sell(sellToday, value);
         }
         return selling;
+    }
+
+    private BigDecimal[] fillValues(int attempts, String val) {
+        BigDecimal[] values = new BigDecimal[attempts+1];
+        Arrays.fill(values, new BigDecimal(val));
+        return values;
     }
 
     /**
@@ -55,13 +60,17 @@ public class CodeTests {
      */
     @Test
     public void total() {
-        SellStocks selling = flexHelper();
+        int attempts = 19;
+        BigDecimal[] values = fillValues(attempts, "10.00");
+        SellStocks selling = flexHelper(values, attempts);
         assertEquals(new BigDecimal("0.00"), selling.getOwned());
     }
 
     @Test
     public void checkStability() {
-        SellStocks selling = flexHelper();
+        int attempts = 19;
+        BigDecimal[] values = fillValues(attempts, "10.00");
+        SellStocks selling = flexHelper(values, attempts);
         System.out.println("Stable? " + selling.getSellHistory());
     }
 
@@ -71,7 +80,9 @@ public class CodeTests {
      */
     @Test
     public void yieldFixed() {
-        SellStocks selling = flexHelper();
+        int attempts = 19;   // zero indexed
+        BigDecimal[] values = fillValues(attempts, "10.00");
+        SellStocks selling = flexHelper(values, attempts);
         // instantiate a yield counter for each approach
         Bank flexBank = new Bank();
         // run and add to the yield counter
@@ -87,6 +98,15 @@ public class CodeTests {
                 + " instead of " + naive
         + "\nYield history: " + Arrays.toString(flexYield.getYields()));
         assertEquals(naive, flex);
+    }
+
+    /**
+     * Demonstrates gains from test runs,
+     * using randomised values.
+     */
+    @Test
+    public void yieldRandom() {
+
     }
 
     @Test
