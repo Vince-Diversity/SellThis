@@ -7,31 +7,31 @@ import java.util.Random;
  */
 public class ValueSim {
 
-    private BigDecimal bot = BigDecimal.ZERO;
-    private BigDecimal top = BigDecimal.ZERO;
+    private final double bot;
+    private final double top;
     private final int valSize;
     private final String simName;
-    private Line line = new Line();
+    private final Line line;
     private double amplitude = 0.; // models local fluctuation extremes
     private Random rand;
 
-
     /**
-     * Constructor for using the arithmetic mean prediction.
+     * When line is the prediction.
      */
-    public ValueSim(BigDecimal bot, BigDecimal top, int valSize) {
+    public ValueSim(double bot, double top, int valSize) {
         this.bot = bot;
         this.top = top;
+        this.line = new Line(bot, ( top - bot ) / (valSize - 1));
         this.valSize = valSize;
         this.simName = "MEAN";
     }
 
- /**
-     * Constructor for fluctuating line prediction.
+    /**
+     * When line is not necessarily the prediction.
      */
-    public ValueSim(double bot, double top, int valSize, double amplitude, Line line, long seed) {
-        this.bot = new BigDecimal(bot).setScale(2, RoundingMode.HALF_UP);
-        this.top = new BigDecimal(top).setScale(2, RoundingMode.HALF_UP);
+    public ValueSim(int valSize, double amplitude, Line line, long seed) {
+        this.bot = 0.;
+        this.top = 0.;
         this.valSize = valSize;
         this.simName = "RAND";
         this.amplitude = amplitude;
@@ -67,15 +67,26 @@ public class ValueSim {
     /**
      * Only works with bounded case.
      */
-    public BigDecimal boundedMean(BigDecimal value) {
-        return top.subtract(value);
+    public BigDecimal boundedMean() {
+        return new BigDecimal(top - bot).setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
      * Mean from uniform distribution around bot and top
      */
     public BigDecimal flexMean() {
-        return bot.add(top.subtract(bot).divide(new BigDecimal(2), RoundingMode.HALF_UP));
+        return new BigDecimal(bot + (top - bot) / 2).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Uses the right hand side of the line as future values.
+     * A line with increment dx and s steps left has
+     * a value sum of current + dx*s/2)
+     */
+    public BigDecimal lineMean() {
+        int remain = valSize - 1;
+        return new BigDecimal( line.getCurrent() + line.getIncrement()*remain/2 )
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     public int getValSize() {
@@ -98,10 +109,6 @@ class Line {
         this.current = current;
         this.increment = increment;
     }
-    public Line() {
-        this.current = 0.;
-        this.increment = 0.;
-    }
     public double next() {
         current += increment;
         return current;
@@ -109,5 +116,9 @@ class Line {
 
     public double getCurrent() {
         return current;
+    }
+
+    public double getIncrement() {
+        return increment;
     }
 }

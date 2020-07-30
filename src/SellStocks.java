@@ -24,6 +24,7 @@ public class SellStocks {
     private final LinkedList<BigDecimal> valueHistory;
     private Function<BigDecimal,BigDecimal> evaluate;
     private BiConsumer<BigDecimal,BigDecimal> proceed;
+    private BigDecimal prediction = BigDecimal.ZERO;
 
     public SellStocks(BigDecimal owned, Limit limit, ValueSim sim) {
         attempts = sim.getValSize() - 1;
@@ -36,9 +37,13 @@ public class SellStocks {
             case BOUNDED:
                 evaluate = this::boundedRate;
                 proceed = this::sellBounded;
+                prediction = sim.boundedMean();
+                break;
             case FLEX:
                 evaluate = this::flexRate;
                 proceed = this::sellFlex;
+                prediction = sim.lineMean();
+                break;
         }
     }
 
@@ -53,8 +58,7 @@ public class SellStocks {
      * Test result: only satisfies the 'total' test if value is mean and correctly predicted.
      */
     private BigDecimal boundedRate(BigDecimal value) {
-        BigDecimal diff = sim.boundedMean(value);
-        BigDecimal future = diff.multiply(new BigDecimal(attempts));
+        BigDecimal future = prediction.multiply(new BigDecimal(attempts));
         BigDecimal denominator = value.add(future);
         BigDecimal proportion = value.divide(denominator, RoundingMode.HALF_UP);
         return proportion.multiply(original).setScale(value.scale(), RoundingMode.HALF_UP);
@@ -65,8 +69,7 @@ public class SellStocks {
      * @return today's sold amount.
      */
     private BigDecimal flexRate(BigDecimal value) {
-        BigDecimal average = sim.flexMean();
-        BigDecimal future = average.multiply(new BigDecimal(attempts));
+        BigDecimal future = prediction.multiply(new BigDecimal(attempts));
         BigDecimal denominator = value.add(future);
         BigDecimal proportion = value.divide(denominator, RoundingMode.HALF_UP);
         return proportion.multiply(owned).setScale(value.scale(), RoundingMode.HALF_UP);

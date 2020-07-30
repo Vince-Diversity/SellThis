@@ -18,16 +18,13 @@ import java.util.LinkedList;
 public class CodeTests {
 
     private final BigDecimal owned = new BigDecimal("100000.00");
-    private final BigDecimal top = new BigDecimal("13.00");
-    private final BigDecimal bot = new BigDecimal("9.00");
     private final int defaultSize = 20;
-    private final long defaultSeed = 400L;
     private final BigDecimal defaultValue = new BigDecimal("10.00");
 
     @Test
     public void reasonable() {
         int attempts = 9;
-        ValueSim sim = new ValueSim(BigDecimal.ZERO, defaultValue.multiply(new BigDecimal(2)), attempts+1);
+        ValueSim sim = new ValueSim(0., 0., attempts+1);
         SellStocks selling = new SellStocks(owned, Limit.BOUNDED, sim);
         BigDecimal sellToday = selling.today(defaultValue);
         System.out.println("Bounded first sell reasonable? " + sellToday);
@@ -50,6 +47,8 @@ public class CodeTests {
     }
 
     private SellStocks defaultFlexTest() {
+        double top = 13.;
+        double bot = 9.;
         ValueSim sim = new ValueSim(bot, top, defaultSize);
         BigDecimal[] values = fillValues(sim.getValSize());
         return flexHelper(values, sim);
@@ -124,7 +123,8 @@ public class CodeTests {
     public void yieldRand() {
         double val = 10.;
         Line line = new Line(val, 0.05);
-        ValueSim sim = new ValueSim(8., 13.,
+        long defaultSeed = 400L;
+        ValueSim sim = new ValueSim(
                 20, 2., line, defaultSeed);
         BigDecimal[] values = sim.randLine();
         BigDecimal simMean = sim.mean(values);
@@ -140,7 +140,7 @@ public class CodeTests {
 
     @Test
     public void  mean() {
-        ValueSim sim = new ValueSim(BigDecimal.ZERO, BigDecimal.ZERO, defaultSize);
+        ValueSim sim = new ValueSim(0., 0., defaultSize);
         BigDecimal[] x = new BigDecimal[9];
         for (int i=0; i<9; i++) {
             x[i] = new BigDecimal(i+11);
@@ -150,7 +150,16 @@ public class CodeTests {
 
     @Test
     public void boundedMean() {
-        ValueSim sim = new ValueSim(new BigDecimal("9.00"), new BigDecimal("11.00"), defaultSize);
+        ValueSim sim = new ValueSim(9, 11., defaultSize);
         assertEquals(new BigDecimal("10.00"), sim.flexMean());
+    }
+
+    @Test
+    public void lineMean() {
+        ValueSim flexSim = new ValueSim(9., 12., 6);
+        BigDecimal edgeMean = flexSim.flexMean();
+        ValueSim lineSim = new ValueSim(9., 12., 6);
+        BigDecimal lineMean = lineSim.lineMean();
+        assertEquals(edgeMean, lineMean);
     }
 }
