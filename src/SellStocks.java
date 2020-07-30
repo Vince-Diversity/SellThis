@@ -1,5 +1,7 @@
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.LinkedList;
 
 public class SellStocks {
@@ -11,15 +13,21 @@ public class SellStocks {
     private final ValueSim sim;
     private final LinkedList<BigDecimal> sellHistory;
     private final LinkedList<BigDecimal> valueHistory;
+    private final Iterator<BigDecimal> values;
 
-    public SellStocks(int attempts, BigDecimal owned, Limit limit, ValueSim sim) {
-        this.attempts = attempts;
+    public SellStocks(BigDecimal owned, Limit limit, ValueSim sim, BigDecimal[] values) {
+        this.attempts = sim.getValSize() - 1;
         this.owned = owned;
         this.original = owned;
         this.limit = limit;
         this.sim = sim;
         this.sellHistory = new LinkedList<>();
         this.valueHistory = new LinkedList<>();
+        this.values = makeIterable(values);
+    }
+
+    private Iterator<BigDecimal> makeIterable(BigDecimal[] old) {
+        return Arrays.stream(old).iterator();
     }
 
     /**
@@ -73,4 +81,12 @@ public class SellStocks {
     public LinkedList<BigDecimal> getSellHistory() { return sellHistory; }
 
     public LinkedList<BigDecimal> getValueHistory() {return valueHistory; }
+
+    public int getAttempts() {
+        return attempts;
+    }
+
+    public ValueSim getSim() {
+        return sim;
+    }
 }

@@ -1,4 +1,3 @@
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -17,31 +16,27 @@ import java.util.LinkedList;
  */
 public class CodeTests {
 
-    private BigDecimal owned;
-    private BigDecimal top;
-    private BigDecimal bot;
-
-    @Before
-    public void setup() {
-        owned = new BigDecimal("100000.00");
-        top = new BigDecimal("13.00");
-        bot = new BigDecimal("9.00");
-    }
+    private final BigDecimal owned = new BigDecimal("100000.00");
+    private final BigDecimal top = new BigDecimal("13.00");
+    private final BigDecimal bot = new BigDecimal("9.00");
+    private final int defaultSize = 20;
+//    private final long defaultSeed = 400L;
+    private final long defaultSeed = 400L;
+    private final BigDecimal defaultValue = new BigDecimal("10.00");
 
     @Test
     public void reasonable() {
         int attempts = 9;
-        BigDecimal value = new BigDecimal("10.00");
-        ValueSim sim = new ValueSim(BigDecimal.ZERO, value.multiply(new BigDecimal(2)));
-        SellStocks selling = new SellStocks(attempts, owned, Limit.BOUNDED, sim);
-        BigDecimal sellToday = selling.today(value);
+        BigDecimal[] values = fillValues(attempts);
+        ValueSim sim = new ValueSim(BigDecimal.ZERO, defaultValue.multiply(new BigDecimal(2)), attempts+1);
+        SellStocks selling = new SellStocks(owned, Limit.BOUNDED, sim, values);
+        BigDecimal sellToday = selling.today(defaultValue);
         System.out.println("Bounded first sell reasonable? " + sellToday);
     }
 
-    private SellStocks flexHelper(BigDecimal[] values, int attempts) {
-        ValueSim sim = new ValueSim(bot, top);
-        SellStocks selling = new SellStocks(attempts, owned, Limit.FLEX, sim);
-        for (int i=attempts; i>=0; i--) {
+    private SellStocks flexHelper(BigDecimal[] values, ValueSim sim) {
+        SellStocks selling = new SellStocks(owned, Limit.FLEX, sim, values);
+        for (int i=0; i<selling.getSim().getValSize(); i++) {
             BigDecimal value = values[i];
             BigDecimal sellToday = selling.today(value);
             selling.sell(sellToday, value);
@@ -49,10 +44,16 @@ public class CodeTests {
         return selling;
     }
 
-    private BigDecimal[] fillValues(int attempts, String val) {
-        BigDecimal[] values = new BigDecimal[attempts+1];
-        Arrays.fill(values, new BigDecimal(val));
+    private BigDecimal[] fillValues(int attempts) {
+        BigDecimal[] values = new BigDecimal[attempts];
+        Arrays.fill(values, defaultValue);
         return values;
+    }
+
+    private SellStocks defaultFlexTest() {
+        ValueSim sim = new ValueSim(bot, top, defaultSize);
+        BigDecimal[] values = fillValues(sim.getValSize());
+        return flexHelper(values, sim);
     }
 
     /**
@@ -60,29 +61,32 @@ public class CodeTests {
      */
     @Test
     public void total() {
-        int attempts = 19;
-        BigDecimal[] values = fillValues(attempts, "10.00");
-        SellStocks selling = flexHelper(values, attempts);
+        SellStocks selling = defaultFlexTest();
         assertEquals(new BigDecimal("0.00"), selling.getOwned());
     }
 
     @Test
     public void checkStability() {
-        int attempts = 19;
-        BigDecimal[] values = fillValues(attempts, "10.00");
-        SellStocks selling = flexHelper(values, attempts);
+        SellStocks selling = defaultFlexTest();
         System.out.println("Stable? " + selling.getSellHistory());
     }
 
-    /**
-     * Demonstrates gains from test runs,
-     * using fixed values.
-     */
-    @Test
-    public void yieldFixed() {
-        int attempts = 19;   // zero indexed
-        BigDecimal[] values = fillValues(attempts, "10.00");
-        SellStocks selling = flexHelper(values, attempts);
+    static class CheckPack {
+        private final BigDecimal known;
+        private final BigDecimal test;
+        public CheckPack(BigDecimal known, BigDecimal test) {
+            this.known = known;
+            this.test = test;
+        }
+        public BigDecimal getKnown() {
+            return known;
+        }
+        public BigDecimal getTest() {
+            return test;
+        }
+    }
+
+    private CheckPack yieldCheck(SellStocks selling) {
         // instantiate a yield counter for each approach
         Bank flexBank = new Bank();
         // run and add to the yield counter
@@ -94,10 +98,23 @@ public class CodeTests {
         // assert that method yields more than naive approach
         BigDecimal flex = flexYield.getTotal();
         BigDecimal naive = flexBank.naiveYield(owned, valueHist);
-        System.out.println("Yield is " + flex
-                + " instead of " + naive
-        + "\nYield history: " + Arrays.toString(flexYield.getYields()));
-        assertEquals(naive, flex);
+        System.out.println(
+                selling.getSim().getSimName()
+                + "Yield is " + flex
+                + " instead of " + naive + " with history: \n"
+                + Arrays.toString(flexYield.getYields()));
+        return new CheckPack(naive, flex);
+    }
+
+    /**
+     * Demonstrates gains from test runs,
+     * using fixed values.
+     */
+    @Test
+    public void yieldFixed() {
+        SellStocks selling = defaultFlexTest();
+        CheckPack check = yieldCheck(selling);
+        assertEquals(check.getKnown(), check.getTest());
     }
 
     /**
@@ -105,13 +122,25 @@ public class CodeTests {
      * using randomised values.
      */
     @Test
-    public void yieldRandom() {
-
+    public void yieldRand() {
+        double horizontalVal = 10.;
+        Line horizontal = new Line(horizontalVal, 0);
+        ValueSim sim = new ValueSim(8., 12.,
+                20, 2., horizontal, defaultSeed);
+        BigDecimal[] values = sim.randLine();
+        BigDecimal simMean = sim.mean(values);
+        double bias = simMean.doubleValue()/horizontalVal;
+        System.out.println("This seed is biased by " + bias + "\n"
+                + "RandDist is \n"
+                + Arrays.toString(values));
+        SellStocks selling = flexHelper(values, sim);
+        CheckPack check = yieldCheck(selling);
+        assertTrue(check.getTest().doubleValue() >= check.getKnown().doubleValue()*bias);
     }
 
     @Test
     public void  mean() {
-        ValueSim sim = new ValueSim(BigDecimal.ZERO, BigDecimal.ZERO);
+        ValueSim sim = new ValueSim(BigDecimal.ZERO, BigDecimal.ZERO, defaultSize);
         BigDecimal[] x = new BigDecimal[9];
         for (int i=0; i<9; i++) {
             x[i] = new BigDecimal(i+11);
@@ -121,7 +150,7 @@ public class CodeTests {
 
     @Test
     public void boundedMean() {
-        ValueSim sim = new ValueSim(new BigDecimal("9.00"), new BigDecimal("11.00"));
+        ValueSim sim = new ValueSim(new BigDecimal("9.00"), new BigDecimal("11.00"), defaultSize);
         assertEquals(new BigDecimal("10.00"), sim.flexMean());
     }
 }
