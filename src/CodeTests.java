@@ -3,6 +3,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.LinkedList;
 
@@ -136,6 +137,8 @@ public class CodeTests {
                 + "RandDist is \n"
                 + Arrays.toString(values));
         assertTrue(check.getTest().doubleValue() >= check.getKnown().doubleValue());
+        // Check that the final prediction is first value + increment*size
+        assertEquals(new BigDecimal("11.00"), selling.getPrediction());
     }
 
     @Test
@@ -157,9 +160,11 @@ public class CodeTests {
     @Test
     public void lineMean() {
         ValueSim flexSim = new ValueSim(9., 12., 6);
-        BigDecimal edgeMean = flexSim.flexMean();
+        // add one increment to edgeMean to simulate taking the future mean
+        BigDecimal compensate = BigDecimal.valueOf(( 12. - 9. ) / (6 - 1)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal edgeMean = flexSim.flexMean().add( compensate );
         ValueSim lineSim = new ValueSim(9., 12., 6);
-        BigDecimal lineMean = lineSim.lineMean();
+        BigDecimal lineMean = lineSim.lineMean(5);
         assertEquals(edgeMean, lineMean);
     }
 }

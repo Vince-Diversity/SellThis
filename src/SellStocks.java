@@ -42,7 +42,6 @@ public class SellStocks {
             case FLEX:
                 evaluate = this::flexRate;
                 proceed = this::sellFlex;
-                prediction = sim.lineMean();
                 break;
         }
     }
@@ -69,6 +68,7 @@ public class SellStocks {
      * @return today's sold amount.
      */
     private BigDecimal flexRate(BigDecimal value) {
+        prediction = sim.lineMean(attempts);
         BigDecimal future = prediction.multiply(new BigDecimal(attempts));
         BigDecimal denominator = value.add(future);
         BigDecimal proportion = value.divide(denominator, RoundingMode.HALF_UP);
@@ -105,5 +105,9 @@ public class SellStocks {
 
     public ValueSim getSim() {
         return sim;
+    }
+
+    public BigDecimal getPrediction() {
+        return prediction;
     }
 }

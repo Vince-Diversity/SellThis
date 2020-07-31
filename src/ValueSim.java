@@ -43,14 +43,19 @@ public class ValueSim {
      * Models the market
      * @param next double between 0 and 1
      */
-    private double nextChange(double next) {
-        return line.next() + amplitude*(2*next - 1.);
+    private double nextChange(double next, Line modelLine) {
+        return modelLine.next() + amplitude*(2*next - 1.);
     }
 
+    /**
+     * Models the market the way it might go.
+     * Makes a copy and pretends this is the market.
+     */
     public BigDecimal[] randLine() {
+        Line modelLine = new Line(line.getCurrent(), line.getIncrement());
         BigDecimal[] val = new BigDecimal[valSize];
         for (int i = 0; i < valSize; i++) {
-            double r = nextChange(rand.nextDouble());
+            double r = nextChange(rand.nextDouble(), modelLine);
             val[i] = new BigDecimal(r).setScale(2, RoundingMode.HALF_UP);
         }
         return val;
@@ -79,14 +84,18 @@ public class ValueSim {
     }
 
     /**
+     * Predicts market.
+     *
      * Uses the right hand side of the line as future values.
      * A line with increment dx and s steps left has
      * a value sum of current + dx*s/2)
      */
-    public BigDecimal lineMean() {
-        int remain = valSize - 1;
-        return new BigDecimal( line.getCurrent() + line.getIncrement()*remain/2 )
+    public BigDecimal lineMean(int remain) {
+        double nextVal = line.next();
+        double midVal = line.getIncrement()*remain/2;
+        BigDecimal mean = new BigDecimal( nextVal + midVal )
                 .setScale(2, RoundingMode.HALF_UP);
+        return mean;
     }
 
     public int getValSize() {
