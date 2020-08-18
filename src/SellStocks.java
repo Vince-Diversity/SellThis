@@ -13,6 +13,19 @@ import java.util.function.Function;
  *
  * where future_value = selling_days_remaining * future_value_prediction.
  * When selling_days_remaining = 0, anything remaining is sold. Should behave smoothly though.
+ *
+ * Actually, the real idea is this:
+ *
+ *      v * a^q
+ * -------------------- * remaining possession
+ * v * a^q + (r^p * f)
+ *
+ * where p and q are risk parameters:
+ * A higher q makes this seller more sensitive to deviations from prediction.
+ * A higher p makes it more confident to wait on selling due to a positive outlook.
+ * a is the ratio between current value and predicted current value.
+ * Safest seller does q = 0 and p = 1.
+ * Only the a^q is implemented for having somewhat use.
  */
 public class SellStocks {
 
@@ -24,9 +37,10 @@ public class SellStocks {
     private final LinkedList<BigDecimal> valueHistory;
     private Function<BigDecimal,BigDecimal> evaluate;
     private BiConsumer<BigDecimal,BigDecimal> proceed;
-    private BigDecimal prediction = BigDecimal.ZERO;
+    private double prediction = 0.;
+    private final double p;
 
-    public SellStocks(BigDecimal owned, Limit limit, ValueSim sim) {
+    public SellStocks(BigDecimal owned, Limit limit, ValueSim sim, double pParam) {
         attempts = sim.getValSize() - 1;
         this.owned = owned;
         original = owned;
@@ -44,6 +58,7 @@ public class SellStocks {
                 proceed = this::sellFlex;
                 break;
         }
+        p = pParam;
     }
 
     /**
@@ -56,23 +71,30 @@ public class SellStocks {
     /**
      * Test result: only satisfies the 'total' test if value is mean and correctly predicted.
      */
-    private BigDecimal boundedRate(BigDecimal value) {
-        BigDecimal future = prediction.multiply(new BigDecimal(attempts));
-        BigDecimal denominator = value.add(future);
-        BigDecimal proportion = value.divide(denominator, RoundingMode.HALF_UP);
-        return proportion.multiply(original).setScale(value.scale(), RoundingMode.HALF_UP);
+    private BigDecimal boundedRate(BigDecimal val) {
+        double value = val.doubleValue();
+        double future = prediction * attempts;
+        double denominator = value+future;
+        double proportionD = value/denominator;
+        BigDecimal proportion = BigDecimal.valueOf(proportionD).setScale(2, RoundingMode.HALF_UP);
+        return proportion.multiply(original).setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
      * Check today's amount to sell.
      * @return today's sold amount.
      */
-    private BigDecimal flexRate(BigDecimal value) {
+    private BigDecimal flexRate(BigDecimal val) {
+        double value = val.doubleValue();
         prediction = sim.lineMean(attempts);
-        BigDecimal future = prediction.multiply(new BigDecimal(attempts));
-        BigDecimal denominator = value.add(future);
-        BigDecimal proportion = value.divide(denominator, RoundingMode.HALF_UP);
-        return proportion.multiply(owned).setScale(value.scale(), RoundingMode.HALF_UP);
+        double future = prediction*attempts;
+        double expectedValue = sim.getLine().getCurrent();
+        double valueRatio = value/expectedValue;
+        valueRatio = Math.pow(valueRatio,p);
+        double weightedValue = value*valueRatio;
+        double denominator = weightedValue + future;
+        double proportion = weightedValue/denominator;
+        return BigDecimal.valueOf(proportion*owned.doubleValue()).setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -107,7 +129,7 @@ public class SellStocks {
         return sim;
     }
 
-    public BigDecimal getPrediction() {
-        return prediction;
+    public int getAttempts() {
+        return attempts;
     }
 }
